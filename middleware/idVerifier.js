@@ -8,8 +8,8 @@ module.exports = function (req, res, next) {
         q.userToBeUnFollowedId ;
 
     if (!valid.isValid(id)) {
-        return res.status(200).json({
-            status: 400,
+        return res.status(404).json({
+            status: 404,
             message: 'failure',
             data: 'invalid id paramater'
         })

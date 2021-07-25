@@ -112,16 +112,16 @@ const userModel = new Schema({
     }
 });
 
-userModel.pre('validate', function (next) {
-    if (this.username) {
-        this.username = slugify(this.username, {
-            strict: true,
-            replacement: '*'
-        })
-    }
+// userModel.pre('validate', function (next) {
+//     if (this.username) {
+//         this.username = slugify(this.username, {
+//             strict: true,
+//             replacement: '*'
+//         })
+//     }
 
-    next();
-});
+//     next();
+// });
 
 userModel.methods.generateToken = function () {
     const token = jwt.sign(

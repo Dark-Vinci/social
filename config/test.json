@@ -1,0 +1,5 @@
+{
+    "name": "social anon",
+    "jwtPass": "12345",
+    "db": "mongodb://localhost/social_test"
+}
