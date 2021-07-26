@@ -112,6 +112,11 @@ const userModel = new Schema({
     }
 });
 
+userModel.virtual('fullname').get( function () {
+    return `${ this.firstName } ${ this.lastName }`
+}) 
+
+
 // userModel.pre('validate', function (next) {
 //     if (this.username) {
 //         this.username = slugify(this.username, {
@@ -266,11 +271,13 @@ function validateFollow(inp) {
     return result;
 }
 
-module.exports.userModel = userModel;
-module.exports.User = User;
-module.exports.validate = validate;
-module.exports.validateLogin = validateLogin;
-module.exports.validateChangePassword = validateChangePassword;
-module.exports.validateChangeProfile = validateChangeProfile;
-module.exports.validatePost = validatePost;
-module.exports.validateFollow = validateFollow;
+module.exports = { 
+    User,
+    userModel,
+    validate,
+    validatePost,
+    validateLogin,
+    validateFollow,
+    validateChangeProfile,
+    validateChangePassword
+}

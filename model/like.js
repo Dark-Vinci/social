@@ -22,6 +22,8 @@ function validateLike(inp) {
     return result;
 }
 
-module.exports.likeModel = likeModel;
-module.exports.Like = Like;
-module.exports.validateLike = validateLike;
+module.exports = {
+    Like,
+    likeModel,
+    validateLike
+}

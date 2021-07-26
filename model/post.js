@@ -82,9 +82,11 @@ function validateComment(inp) {
     return result;
 }
 
-module.exports.postModel = postModel;
-module.exports.Post = Post;
-module.exports.validatePost = validatePost;
-module.exports.validateRepost = validateRepost;
-module.exports.validateLike = validateLike;
-module.exports.validateComment = validateComment;
+module.exports = {
+    Post,
+    postModel,
+    validatePost,
+    validateRepost,
+    validateLike,
+    validateComment
+}

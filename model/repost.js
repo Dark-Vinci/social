@@ -28,6 +28,8 @@ function validateRepost(inp) {
     return result;
 }
 
-module.exports.repostModel = repostModel;
-module.exports.Repost = Repost;
-module.exports.validateRepost = validateRepost;
+module.exports = {
+    Repost,
+    repostModel,
+    validateRepost
+}

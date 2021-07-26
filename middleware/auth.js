@@ -4,7 +4,11 @@ const config = require('config');
 module.exports = function (req, res, next) {
     const token = req.header('x-auth-token');
     if (!token) {
-        res.status(401).send('no token provided');
+        return res.status(401).json({
+            status: 401,
+            message: 'failure',
+            data: 'no token is provided'
+        })
     } else {
         try {
             const decoded = jwt.verify(token, config.get('jwtPass'));

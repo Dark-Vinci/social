@@ -9,6 +9,7 @@ const { Admin, validate,
 } = require('../model/admin');
 const { Post } = require('../model/post');
 const { User } = require('../model/users');
+const { Blocked } = require('../model/blocked');
 
 const validateId = require('../middleware/idVerifier');
 const wrapper = require('../middleware/wrapper');
@@ -29,6 +30,42 @@ router.get('/', adminMiddleware, wrapper (async (req, res) => {
         message: 'success',
         data: admins
     });
+}));
+
+router.get('/blockedUser', adminMiddleware, wrapper (async (req, res) => {
+    const blockedUsers = await Blocked.stillBlocked();
+    
+    if (blockedUsers.length === 0) {
+        return res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: 'currently, there are no blocked users'
+        })
+    } else {
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: blockedUsers
+        });
+    }
+}));
+
+router.get('/onceblockedUser', adminMiddleware, wrapper (async (req, res) => {
+    const onceBlocked = await Blocked.onceBlocked();
+
+    if (onceBlocked.length === 0) {
+        return res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: 'currently, there are no blocked users'
+        });
+    } else {
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: onceBlocked
+        });
+    }
 }));
 
 router.get('/:id', adminMiddlewareAndId, wrapper (async (req, res) => {
@@ -136,55 +173,83 @@ router.delete('/deletePost/:postId', adminMiddlewareAndId, wrapper (async (req, 
     }
 }));
 
-router.put('/blockUser/:userId', adminMiddlewareAndId, wrapper (async (req, res) => {
+router.put('/unblock/:blockId', adminMiddlewareAndId, wrapper (async (req, res) => {
+    const { blockId } = req.params; 
+    const blocked = await Blocked.findByIdAndUpdate(blockId);
+
+    if (!blocked) {
+        return res.status(404).json({
+            status: 404,
+            message: 'failure',
+            data: 'no such blocked id in the db...'
+        })
+    } else {
+        if (blocked.unblocked) {
+            return res.status(400).json({
+                status: 400,
+                message: 'failure',
+                data: 'the user unblocked before now'
+            })
+        }
+
+        const userId = blocked.userId;
+        const user = await User.findById(userId)
+            .select({ password: 1, username: 1 })
+        console.log(user)
+        const wrongPassword = user.password;
+        const indexToSplice = wrongPassword.length - 1;
+        const changed = wrongPassword.split('').splice(0, indexToSplice).join('');
+        user.password = changed;
+
+        blocked.set({
+            unblockedBy: req.user._id,
+            unblockedAt: new Date(),
+            unblocked: true
+        });
+
+        await user.save();
+        await blocked.save();
+
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: `${ user.username } has been successfully unblocked`
+        });
+    }
+}));
+
+router.post('/block/:userId', adminMiddlewareAndId, wrapper (async (req, res) => {
     const { userId } = req.params;
+    const adminUsername = req.user.username;
 
     const user = await User.findById(userId)
         .select('password');
 
     if (!user) {
-        return res.status(200).json({
-            status: 200,
-            message: 'success',
+        return res.status(404).json({
+            status: 404,
+            message: 'failure',
             data: 'no such user in the db'
         })
     } else {
         const changed = user.password + 1;
         user.password = changed;
+
+        const reason = req.query.reason;
+        const blocked = new Blocked({
+            userId,
+            reason,
+            blockedBy: adminUsername
+        });
+
+        await blocked.save();
         await user.save();
 
         res.status(200).json({
             status: 200,
             message: 'success',
-            data: 'password has been changed'
+            data: `${ user.username } has been blocked with block id ${ blocked._id }`
         })
-    }
-}));
-
-router.put('/unblockUser/:userId', adminMiddlewareAndId, wrapper (async (req, res) => {
-    const { userId } = req.params;
-
-    const user = await User.findById(userId)
-        .select('password');
-    
-    if (!user) {
-        return res.status(400).json({
-            status: 400,
-            message: 'failure',
-            data: 'user doesnt exist in the database'
-        });
-    } else {
-        const wrongPassword = user.password;
-        const indexToSplice = wrongPassword.length - 1;
-        const changed = wrongPassword.split('').splice(0, indexToSplice).join('');
-        user.password = changed;
-        await user.save();
-
-        res.status(200).json({
-            status: 200,
-            message: 'success',
-            data: 'password has been reset'
-        });
     }
 }));
 

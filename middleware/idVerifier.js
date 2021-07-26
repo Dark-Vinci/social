@@ -5,7 +5,7 @@ module.exports = function (req, res, next) {
     const q = req.params;
     const id = q.id || q.postId || q.userId || 
         q.userToBeCheckedId || q.userToBeFollowedId || 
-        q.userToBeUnFollowedId ;
+        q.userToBeUnFollowedId || q.blockId ;
 
     if (!valid.isValid(id)) {
         return res.status(404).json({

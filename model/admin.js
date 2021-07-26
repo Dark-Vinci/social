@@ -138,9 +138,11 @@ function validateLogin(inp) {
     return result;
 }
 
-module.exports.adminModel = adminModel;
-module.exports.Admin = Admin;
-module.exports.validate = validate;
-module.exports.validatePut = validatePut;
-module.exports.validatePasswordChange = validatePasswordChange;
-module.exports.validateLogin = validateLogin;
+module.exports = {
+    Admin,
+    adminModel,
+    validate,
+    validatePut,
+    validateLogin, 
+    validatePasswordChange
+}
