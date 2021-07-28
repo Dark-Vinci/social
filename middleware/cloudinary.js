@@ -8,9 +8,9 @@ const cloudinary = require('cloudinary').v2;
 // });
 
 cloudinary.config({
-    cloud_name: "dmqclv2qr",
-    api_key: 715936618997629,
-    api_secret: "1wbFEaCiVD9_tSaeKWF0SBC7J-E"
+    cloud_name: "ajkiscgme",
+    api_key: 1234567890,
+    api_secret: "7wbDEcCiVj0_mSadKWF9SBC1J-l"
 })
 
 module.exports = cloudinary;

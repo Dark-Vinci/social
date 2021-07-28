@@ -6,48 +6,39 @@ const router = express.Router();
 
 const { User, validateLogin } = require('../model/users');
 const wrapper = require('../middleware/wrapper');
+const bodyValidator = require('../middleware/bodyValidator');
 
-router.post('/', wrapper( async (req, res) => {
-    const { error } = validateLogin(req.body);
+router.post('/', bodyValidator(validateLogin), wrapper( async (req, res) => {
+    const { emailOrUsername, password } = req.body;
 
-    if (error) {
+    const user1 = await User.findOne({ email: emailOrUsername });
+    const user2 = await User.findOne({ username: emailOrUsername });
+
+    if (!user1 && !user2) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
-            data: error.details[0].message
+            data: 'invalid input field'
         })
-    } else {  
-        const { emailOrUsername, password } = req.body;
+    }
 
-        const user1 = await User.findOne({ email: emailOrUsername });
-        const user2 = await User.findOne({ username: emailOrUsername });
+    let user = user1 || user2;
 
-        if (!user1 && !user2) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input field'
-            })
-        }
-
-        let user = user1 || user2;
-
-        const isValid = await bcrypt.compare(password, user.password);
-        
-        if (!isValid) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input field'
-            })
-        } else {
-            const token = user.generateToken();
-            res.status(200).header("x-auth-token", token).json({
-                status: 200,
-                message: 'success',
-                data: `youre welcome ${ user.username }`
-            })
-        }
+    const isValid = await bcrypt.compare(password, user.password);
+    
+    if (!isValid) {
+        return res.status(400).json({
+            status: 400,
+            message: 'failure',
+            data: 'invalid input field'
+        })
+    } else {
+        const token = user.generateToken();
+        res.status(200).header("x-auth-token", token).json({
+            status: 200,
+            message: 'success',
+            data: `youre welcome ${ user.username }`
+        })
     }
 }));
 

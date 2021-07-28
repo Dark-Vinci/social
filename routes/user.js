@@ -13,9 +13,12 @@ const multer = require('../middleware/multer');
 const validateId = require('../middleware/idVerifier');
 const wrapper = require('../middleware/wrapper');
 const auth = require('../middleware/auth');
+const bodyValidator = require('../middleware/bodyValidator');
 
 const validateIdAndAuthMiddleware = [ validateId, auth ];
-const authAndUploadDpMiddleware = [auth, multer.single('image')];
+const authAndUploadDpMiddleware = [ auth, multer.single('image') ];
+const validateAuthAndBodyB = [ auth, bodyValidator(validateChangePassword) ];
+const validateAuthAndBodyA = [ auth, bodyValidator(validateChangeProfile) ];
 
 router.get('/', wrapper (async (req, res) => {
     const users = await User.find()
@@ -232,34 +235,24 @@ router.post('/logout', auth, wrapper ((req, res) => {
     });
 }));
 
-router.put('/updateProfile', auth, wrapper (async (req, res) => {
-    const { error } = validateChangeProfile(req.body);
+router.put('/updateProfile', validateAuthAndBodyA , wrapper (async (req, res) => {
+    const id = req.user._id
+    const user = await User.findById(id)
+        .select('-password');
 
-    if (error) {
-        return res.status(400).json({
-            status: 400,
-            message: 'failure',
-            data: error.details[0].message
-        })
-    } else {
-        const id = req.user._id
-        const user = await User.findById(id)
-            .select('-password');
+    const { firstName, lastName, description } = req.body;
+    user.set({
+        firstName: firstName || user.firstName,
+        lastName: lastName || user.lastName,
+        description: description || user.description
+    });
 
-        const { firstName, lastName, description } = req.body;
-        user.set({
-            firstName: firstName || user.firstName,
-            lastName: lastName || user.lastName,
-            description: description || user.description
-        });
-
-        await user.save();
-        res.status(200).json({
-            status: 200,
-            message: 'success',
-            data: 'status has been uploaded successfully'
-        })
-    }
+    await user.save();
+    res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: 'status has been uploaded successfully'
+    });
 }));
 
 router.put('/follow/:userToBeFollowedId', validateIdAndAuthMiddleware, wrapper (async (req, res) => {
@@ -338,43 +331,33 @@ router.put('/unfollow/:userToBeUnFollowedId', validateIdAndAuthMiddleware, wrapp
     }
 }));
 
-router.put('/changepassword', auth, wrapper (async (req, res) => {
+router.put('/changepassword', validateAuthAndBodyB, wrapper (async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId)
         .select('password');
 
-        const { error } = validateChangePassword(req.body);
+    const { oldPassword, newPassword } = req.body;
+    const valid = await bcrypt.compare(oldPassword, user.password);
 
-    if (error) {
+    if (!valid) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
-            data: error.details[0].message
+            data: 'invalid input field'
         });
     } else {
-        const { oldPassword, newPassword } = req.body;
-        const valid = await bcrypt.compare(oldPassword, user.password);
+        const stored = newPassword;
+        const salt = await bcrypt.genSalt(10);
+        let hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        if (!valid) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input field'
-            })
-        } else {
-            const stored = newPassword;
-            const salt = await bcrypt.genSalt(10);
-            let hashedPassword = await bcrypt.hash(newPassword, salt);
+        user.password = hashedPassword;
+        await user.save();
 
-            user.password = hashedPassword;
-            await user.save();
-
-            res.status(200).json({
-                status: 200,
-                message: 'success',
-                data: `your new password is now ${ stored }`
-            })
-        }
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: `your new password is now ${ stored }`
+        })
     }
 }));
 

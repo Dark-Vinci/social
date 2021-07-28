@@ -8,8 +8,10 @@ const { validatePost, Post } = require('../model/post');
 const validateId = require('../middleware/idVerifier');
 const wrapper = require('../middleware/wrapper');
 const auth = require('../middleware/auth');
+const bodyValidator = require('../middleware/bodyValidator');
 
 const validateIdAndAuth = [validateId, auth];
+const authAndBodyMiddleware = [ auth, bodyValidator(validatePost) ]
 
 router.get('/all', wrapper (async (req, res) => {
     const posts = await Post.find()
@@ -308,42 +310,32 @@ router.put('/unrepost/:postId', validateIdAndAuth, wrapper (async (req, res) => 
     }
 }));
 
-router.post('/createPost', auth, wrapper (async (req, res) => {
-    const { error } = validatePost(req.body);
+router.post('/createPost', authAndBodyMiddleware, wrapper (async (req, res) => {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    const { content } = req.body;
 
-    if (error) {
+    if (!user) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
-            data: error.details[0].message
+            data: 'you broke something'
         });
     } else {
-        const userId = req.user._id;
-        const user = await User.findById(userId);
-        const { content } = req.body;
+        const post = new Post({
+            content: content,
+            postedBy: userId
+        });
+        await post.save();
 
-        if (!user) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'you broke something'
-            });
-        } else {
-            const post = new Post({
-                content: content,
-                postedBy: userId
-            });
-            await post.save();
+        user.post.push(post._id);
+        await user.save();
 
-            user.post.push(post._id);
-            await user.save();
-
-            res.status(200).json({
-                status: 200,
-                message: 'success',
-                data: post
-            });
-        }
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: post
+        });
     }
 }));
 
@@ -362,9 +354,9 @@ router.delete('/:postId', validateIdAndAuth, wrapper (async (req, res) => {
             data: 'you dont have such post in your store'
         });
     } else {
-        await Post.findByIdAndDelete(postId) //from post from the post document
+        await Post.findByIdAndDelete(postId) 
 
-        user.post.splice(index, 1); // delete the post from the user
+        user.post.splice(index, 1); 
         await user.save();
         return res.status(200).json({
             status: 200,

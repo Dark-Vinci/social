@@ -6,18 +6,9 @@ const router = express.Router();
 const { Post } = require('../model/post');
 const { User } = require('../model/users');
 const wrapper = require('../middleware/wrapper');
+const bodyValidator = require('../middleware/bodyValidator');
 
-router.post('/', wrapper (async (req, res) => {
-    const { error } = validate(req.body);
-
-    if (error) {
-        return res.status(400).json({
-            status: 400,
-            message: 'failure',
-            data: error.details[0].message
-        })
-    }
-    
+router.post('/', bodyValidator(validate), wrapper (async (req, res) => {
     const { searchParams } = req.body;
     const regexString = `.*${ searchParams }.*`;
 

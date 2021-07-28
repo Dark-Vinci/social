@@ -8,5 +8,5 @@ module.exports = function () {
         useNewUrlParser: true,
         useUnifiedTopology: true
     })
-        .then(() => winston.info(`connected to ${db}`))
+        .then(() => winston.info(`connected to ${ db }`))
 }

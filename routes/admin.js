@@ -16,10 +16,12 @@ const wrapper = require('../middleware/wrapper');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 const superAdmin = require('../middleware/superAdmin');
+const bodyValidator = require('../middleware/bodyValidator');
 
 const adminMiddleware = [ auth, admin ];
 const adminMiddlewareAndId = [ validateId, auth, admin ];
 const superAdminMiddlewareAndId = [ validateId, auth, admin, superAdmin ] ;
+const validateAdminAndBody = [ adminMiddleware, bodyValidator(validatePasswordChange) ];
 
 router.get('/', adminMiddleware, wrapper (async (req, res) => {
     const admins = await Admin.find()
@@ -253,47 +255,37 @@ router.post('/block/:userId', adminMiddlewareAndId, wrapper (async (req, res) =>
     }
 }));
 
-router.post('/login', wrapper (async (req, res) => {
-    const { error } = validateLogin(req.bdoy);
+router.post('/login', bodyValidator(validateLogin), wrapper (async (req, res) => {
+    const { emailOrUsername, password } = req.body;
 
-    if (error) {
+    const user1 = await Admin.findOne({ email: emailOrUsername });
+    const user2 = await Admin.findOne({ username: emailOrUsername });
+
+    if (!user1 && !user2) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
-            data: error.details[0].message
+            data: 'invalid input parameter'
+        });
+    }
+
+    let admin = user1 || user2;
+
+    const isValid = await bcrypt.compare(password, admin.password);
+    
+    if (!isValid) {
+        return res.status(400).json({
+            status: 400,
+            message: 'failure',
+            data: 'invalid input parameters'
         });
     } else {
-        const { emailOrUsername, password } = req.body;
-
-        const user1 = await Admin.findOne({ email: emailOrUsername });
-        const user2 = await Admin.findOne({ username: emailOrUsername });
-
-        if (!user1 && !user2) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input parameter'
-            });
-        }
-
-        let admin = user1 || user2;
-
-        const isValid = await bcrypt.compare(password, admin.password);
-        
-        if (!isValid) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input parameters'
-            });
-        } else {
-            const token = admin.generateToken();
-            res.status(200).header('x-auth-token', token).json({
-                status: 200,
-                message: 'success',
-                data: `youre welcome ${ admin.username }`
-            });
-        }
+        const token = admin.generateToken();
+        res.status(200).header('x-auth-token', token).json({
+            status: 200,
+            message: 'success',
+            data: `youre welcome ${ admin.username }`
+        });
     }
 }));
 
@@ -306,130 +298,107 @@ router.post('/logout', adminMiddleware, wrapper ((req, res) => {
     })
 }));
 
-// tested
-router.post('/register', wrapper (async (req, res) => {
+router.post('/register', bodyValidator(validate), wrapper (async (req, res) => {
     const adminNumber = await Admin.find()
         .count();
 
-    if (adminNumber >= 10) {
+    if (adminNumber >= 5) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
             data: 'sorry, we cant have more than 10 amdins'
         })
     } else {
-        const { error } = validate(req.body);
-        if (error) {
+        const { email, phoneNumber, username, password } = req.body;
+
+        const user1 = await Admin.findOne({ email });
+        const user2 = await Admin.findOne({ phoneNumber });
+
+        if (user1) {
             return res.status(400).json({
                 status: 400,
                 message: 'failure',
-                data: error.details[0].message
+                data: 'theres a user with same email'
             });
-        } else {
-            const { email, phoneNumber, username, password } = req.body;
-
-            const user1 = await Admin.findOne({ email });
-            const user2 = await Admin.findOne({ phoneNumber });
+        }
     
-            if (user1) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'failure',
-                    data: 'theres a user with same email'
-                });
-            }
-    
-            if (user2) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'failure',
-                    data: 'theres a user with same phoneNumber'
-                });
-            }
-
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(password, salt);
-
-            const admin = new Admin({
-                email,
-                phoneNumber,
-                username,
-                password: hashedPassword
+        if (user2) {
+            return res.status(400).json({
+                status: 400,
+                message: 'failure',
+                data: 'theres a user with same phoneNumber'
             });
+        }
 
-            if (adminNumber == 0) {
-                admin.power = 7;
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const admin = new Admin({
+            email,
+            phoneNumber,
+            username,
+            password: hashedPassword
+        });
+
+        if (adminNumber == 0) {
+            admin.power = 7;
+        }
+
+        try {
+            await admin.save();
+            const token = admin.generateToken();
+            const toReturn = _.pick(admin, ['power', 'email', '_id', 'username', 'phoneNumber']);
+            res.header('x-auth-token', token).status(200).json({
+                status: 200,
+                message: 'success',
+                data: toReturn
+            })
+        } catch (ex) {
+            let message = '';
+
+            for (field in ex.errors) {
+                message += ex.errors[field].message;
             }
 
-            try {
-                await admin.save();
-                const token = admin.generateToken();
-                const toReturn = _.pick(admin, ['power', 'email', '_id', 'username', 'phoneNumber']);
-                res.header('x-auth-token', token).status(200).json({
-                    status: 200,
-                    message: 'success',
-                    data: toReturn
-                })
-            } catch (ex) {
-                let message = '';
-
-                for (field in ex.errors) {
-                    message += ex.errors[field].message;
-                }
-
-                return res.status(400).json({
-                    status: 400,
-                    message: 'failure',
-                    data: message
-                });
-            }
+            return res.status(400).json({
+                status: 400,
+                message: 'failure',
+                data: message
+            });
         }
     }
 }));
 
-// tested
-router.put('/changepassword', adminMiddleware, wrapper (async (req, res) => {
+router.put('/changepassword', validateAdminAndBody, wrapper (async (req, res) => {
     const adminId = req.user._id;
     const admin = await Admin.findById(adminId)
         .select('password');
 
-    const { error } = validatePasswordChange(req.body);
+    const { oldPassword, newPassword } = req.body;
+    const valid = await bcrypt.compare(oldPassword, admin.password);
 
-    if (error) {
+    if (!valid) {
         return res.status(400).json({
             status: 400,
             message: 'failure',
-            data: error.details[0].message
+            data: 'invalid input fields'
         })
     } else {
-        console.log(admin)
-        const { oldPassword, newPassword } = req.body;
-        const valid = await bcrypt.compare(oldPassword, admin.password);
+        const stored = newPassword;
+        const salt = await bcrypt.genSalt(10);
+        let hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        if (!valid) {
-            return res.status(400).json({
-                status: 400,
-                message: 'failure',
-                data: 'invalid input fields'
-            })
-        } else {
-            const stored = newPassword;
-            const salt = await bcrypt.genSalt(10);
-            let hashedPassword = await bcrypt.hash(newPassword, salt);
+        admin.password = hashedPassword;
+        await admin.save();
 
-            admin.password = hashedPassword;
-            await admin.save();
-
-            res.status(200).json({
-                status: 200,
-                message: 'success',
-                data: `your new password is now ${ stored }`
-            })
-        }  
-    }
+        res.status(200).json({
+            status: 200,
+            message: 'success',
+            data: `your new password is now ${ stored }`
+        })
+    }  
 }));
 
-// tested
 router.delete('/:id', superAdminMiddlewareAndId, wrapper (async (req, res) => {
     const { id } = req.params;
     const admin = await Admin.findByIdAndRemove(id);
